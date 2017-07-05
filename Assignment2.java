@@ -120,6 +120,7 @@ class Aeroplane extends Thread {
   int passengers; // number of passengers on plane
   Semaphore alertLand; // to alert passengers that we have landed
   Semaphore alertLaunch; // to alert passengers that we have launched
+  Semaphore planeReady;
 
   // constructor
   public Aeroplane(Airport sp, int id) {
@@ -143,20 +144,24 @@ class Aeroplane extends Thread {
         dest = sp.wait4landing(this);
         System.out.println("Aeroplane " + id + " landing on pad " + dest);
 
+        planeReady = sp.semPadReady[dest];
         // Tell the passengers that we have landed
         alertLand.release();
 
         // Wait until all passengers leave
+        try {
+          planeReady.acquire(); // plane waits to be ready for passengers
+        } catch (InterruptedException e) { break; }
 
         System.out.println("Aeroplane " + id + " boarding to "+Assignment2.destName[dest]+" now!");
 
         // the passengers can start to board now
-        sp.boarding(dest);
+        sp.boarding(dest); //
 
         // Wait until full of passengers
 
         // 4, 3, 2, 1, Launch!
-        //sp.launch(dest);
+        sp.launch(dest);
 
         System.out.println("Aeroplane " + id + " launches towards "+Assignment2.destName[dest]+"!");
 
@@ -178,6 +183,11 @@ class Aeroplane extends Thread {
   // called by the passengers leaving the aeroplane
   public void leave() throws InterruptedException  {
     // your code here
+    passengers--;
+    if (passengers == 0) {
+      // allow new passengers to board
+      planeReady.release();
+    }
   }
 
   // called by the passengers sitting in the aeroplane, to wait
@@ -207,8 +217,9 @@ class Airport {
 
   // your code here (other local variables and semaphores)
   Semaphore[] semPadLand = new Semaphore[Assignment2.DESTINATIONS]; // for planes to request to land on pad
-  Semaphore[] semPadBoard = new Semaphore[Assignment2.DESTINATIONS]; // for passengers to request to board on plane
+  Semaphore[] semPadReady = new Semaphore[Assignment2.DESTINATIONS]; // for planes on pad ready to accept passengers
   Semaphore[] semPadLaunch = new Semaphore[Assignment2.DESTINATIONS]; // for planes to request to launch from pad
+  Semaphore[] semPadBoard = new Semaphore[Assignment2.DESTINATIONS]; // for passengers to request to board plane
 
   // constructor
   public Airport() {
@@ -220,8 +231,9 @@ class Airport {
     for(i=0; i<Assignment2.DESTINATIONS; i++) {
       pads[i] = null;
       semPadLand[i] = new Semaphore(1, true); // initially all pads are empty/available
-      semPadBoard[i] = new Semaphore(0, true);
+      semPadReady[i] = new Semaphore(0, true);
       semPadLaunch[i] = new Semaphore(0, true);
+      semPadBoard[i] = new Semaphore(0, true);
     }
     // your code here (local variable and semaphore initializations)
   }
@@ -244,6 +256,15 @@ class Airport {
     try {
       semPadBoard[dest].acquire();
     } catch (InterruptedException e) { }
+
+    plane.passengers++; // increase # passengers
+
+    if (plane.passengers < Assignment2.PLANE_SIZE) {
+      semPadBoard[dest].release(); // allow more passengers to board
+    }
+    else if (plane.passengers == Assignment2.PLANE_SIZE) {
+      semPadLaunch[dest].release(); // we are ready to launch
+    }
 
     return plane;
   }
@@ -278,6 +299,10 @@ class Airport {
       semPadLand[pad].acquire(); // try to land on pad
     } catch (InterruptedException e) { }
 
+    if (sh.passengers == 0) {
+      semPadReady[pad].release(); // if plane arrives empty it can accept passengers right away
+    }
+
     return pad;
   }
 
@@ -285,6 +310,10 @@ class Airport {
   // airport that the pad has been emptied
   public void launch(int dest) {
     // your code here
+    try {
+      semPadLaunch[dest].acquire();
+    } catch (InterruptedException e) { }
+
     semPadLand[dest].release(); // pad is now empty
     pads[dest] = null;
   }
