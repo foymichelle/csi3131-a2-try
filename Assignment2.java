@@ -144,11 +144,12 @@ class Aeroplane extends Thread {
         System.out.println("Aeroplane " + id + " boarding to "+Assignment2.destName[dest]+" now!");
 
         // the passengers can start to board now
+        sp.boarding(dest);
 
         // Wait until full of passengers
 
         // 4, 3, 2, 1, Launch!
-        sp.launch(dest);
+        //sp.launch(dest);
 
         System.out.println("Aeroplane " + id + " launches towards "+Assignment2.destName[dest]+"!");
 
@@ -192,6 +193,7 @@ class Airport {
 
   // your code here (other local variables and semaphores)
   Semaphore[] semPadLand = new Semaphore[Assignment2.DESTINATIONS]; // for planes to request to land on pad
+  Semaphore[] semPadBoard = new Semaphore[Assignment2.DESTINATIONS]; // for passengers to request to board on plane
 
   // constructor
   public Airport() {
@@ -203,8 +205,11 @@ class Airport {
     for(i=0; i<Assignment2.DESTINATIONS; i++) {
       pads[i] = null;
       semPadLand[i] = new Semaphore(1, true); // initially all pads are empty/available
+      semPadBoard[i] = new Semaphore(0, true);
     }
     // your code here (local variable and semaphore initializations)
+    for (i=0; i<Assignment2.AEROPLANES; i++) {
+    }
   }
 
   // called by a passenger wanting to go to the given destination
@@ -212,12 +217,27 @@ class Airport {
   // Careful here, as the pad might be empty at this moment
   public Aeroplane wait4Ship(int dest) throws InterruptedException {
     // your code here
-    return new Aeroplane(this, 0);
+    Aeroplane plane = pads[dest];
+
+    // check if there is a plane on pad to destination
+    while (plane == null) {
+      if (pads[dest] != null) {
+        plane = pads[dest];
+      }
+    }
+
+    // try to board plane
+    try {
+      semPadBoard[dest].acquire();
+    } catch (InterruptedException e) { }
+
+    return plane;
   }
 
   // called by an aeroplane to tell the airport that it is accepting passengers now to destination dest
   public void boarding(int dest) {
     // your code here
+    semPadBoard[dest].release();
   }
 
   // called by an aeroplane returning from a trip
