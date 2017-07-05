@@ -117,6 +117,9 @@ class Aeroplane extends Thread {
   private Airport sp;
   private boolean enjoy;
   // your code here (other local variables and semaphores)
+  int passengers; // number of passengers on plane
+  Semaphore alertLand; // to alert passengers that we have landed
+  Semaphore alertLaunch; // to alert passengers that we have launched
 
   // constructor
   public Aeroplane(Airport sp, int id) {
@@ -124,6 +127,9 @@ class Aeroplane extends Thread {
     this.id = id;
     enjoy = true;
     // your code here (local variable and semaphore initializations)
+    passengers = 0;
+    alertLand = new Semaphore(0, true);
+    alertLaunch = new Semaphore(0, true);
   }
 
   // the aeroplane thread executes this
@@ -138,6 +144,7 @@ class Aeroplane extends Thread {
         System.out.println("Aeroplane " + id + " landing on pad " + dest);
 
         // Tell the passengers that we have landed
+        alertLand.release();
 
         // Wait until all passengers leave
 
@@ -154,6 +161,7 @@ class Aeroplane extends Thread {
         System.out.println("Aeroplane " + id + " launches towards "+Assignment2.destName[dest]+"!");
 
         // tell the passengers we have launched, so they can enjoy now ;-)
+        alertLaunch.release();
 
         // Fly in the air
         stime = 500+(int) (1500*Math.random());
@@ -176,12 +184,18 @@ class Aeroplane extends Thread {
   // until the launch
   public void wait4launch() throws InterruptedException {
     // your code here
+    try {
+      alertLaunch.acquire();
+    } catch (InterruptedException e) { }
   }
 
   // called by the bored passengers sitting in the aeroplane, to wait
   // until landing
   public void wait4landing() throws InterruptedException {
     // your code here
+    try {
+      alertLand.acquire();
+    } catch (InterruptedException e) { }
   }
 }
 
@@ -194,6 +208,7 @@ class Airport {
   // your code here (other local variables and semaphores)
   Semaphore[] semPadLand = new Semaphore[Assignment2.DESTINATIONS]; // for planes to request to land on pad
   Semaphore[] semPadBoard = new Semaphore[Assignment2.DESTINATIONS]; // for passengers to request to board on plane
+  Semaphore[] semPadLaunch = new Semaphore[Assignment2.DESTINATIONS]; // for planes to request to launch from pad
 
   // constructor
   public Airport() {
@@ -206,10 +221,9 @@ class Airport {
       pads[i] = null;
       semPadLand[i] = new Semaphore(1, true); // initially all pads are empty/available
       semPadBoard[i] = new Semaphore(0, true);
+      semPadLaunch[i] = new Semaphore(0, true);
     }
     // your code here (local variable and semaphore initializations)
-    for (i=0; i<Assignment2.AEROPLANES; i++) {
-    }
   }
 
   // called by a passenger wanting to go to the given destination
