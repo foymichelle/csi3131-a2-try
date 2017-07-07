@@ -118,7 +118,6 @@ class Aeroplane extends Thread {
   private boolean enjoy;
   // your code here (other local variables and semaphores)
   int passengers; // number of passengers on plane
-  Semaphore alertLand; // to alert passengers that we have landed
   Semaphore alertLaunch; // to alert passengers that we have launched
   Semaphore planeReady;
 
@@ -129,7 +128,6 @@ class Aeroplane extends Thread {
     enjoy = true;
     // your code here (local variable and semaphore initializations)
     passengers = 0;
-    alertLand = new Semaphore(0, true);
     alertLaunch = new Semaphore(0, true);
   }
 
@@ -197,7 +195,7 @@ class Aeroplane extends Thread {
       // allow new passengers to board
       planeReady.release();
     }
-    else {
+    else if (passengers > 0) {
       sp.semPadLeave[id].release(); // allow more passengers to leave
     }
   }
@@ -218,6 +216,7 @@ class Aeroplane extends Thread {
     try {
       sp.semAeroLand[id].acquire();
     } catch (InterruptedException e) { }
+    System.out.println("Plane "+id+" has landed so passengers cna leave...");
   }
 }
 
@@ -228,8 +227,9 @@ class Airport {
   // what is sitting on a given pad
 
   // your code here (other local variables and semaphores)
-  Semaphore[] semPadLand = new Semaphore[Assignment2.DESTINATIONS]; // for planes to request to land on pad
-  Semaphore[] semPadReady = new Semaphore[Assignment2.DESTINATIONS]; // for planes on pad ready to accept passengers
+  Semaphore[] semPadLand = new Semaphore[Assignment2.DESTINATIONS]; // for planes to request to land
+  Semaphore[] semPadReady = new Semaphore[Assignment2.DESTINATIONS]; // for planes to alert that they are ready for boarding
+
   Semaphore[] semPadLaunch = new Semaphore[Assignment2.AEROPLANES]; // for planes to request to launch from pad
   Semaphore[] semPadBoard = new Semaphore[Assignment2.AEROPLANES]; // for passengers to request to board plane
   Semaphore[] semPadLeave = new Semaphore[Assignment2.AEROPLANES]; // for passengers to request to leave plane
@@ -271,19 +271,6 @@ class Airport {
       }
     }
 
-    // System.out.println("=============================");
-    //
-    // for (int i=0; i<pads.length; i++) {
-    //   if (pads[i] != null) {
-    //     System.out.println("pads["+i+"] = plane "+pads[i].id);
-    //   }
-    //   else {
-    //     System.out.println("pads["+i+"] = empty");
-    //   }
-    // }
-    //
-    // System.out.println("=============================");
-
     // try to board plane
     try {
       semPadBoard[plane.id].acquire();
@@ -305,7 +292,7 @@ class Airport {
   public void boarding(int dest) {
     // your code here
     Aeroplane plane = pads[dest];
-    semPadBoard[plane.id].release();
+    semPadBoard[plane.id].release(); // can accept first passenger
   }
 
   // called by an aeroplane returning from a trip
@@ -326,10 +313,13 @@ class Airport {
         try {
           semPadLand[pad].acquire(); // try to land on pad
         } catch (InterruptedException e) { }
-        pads[i] = sh;
         break;
       }
     }
+
+    pads[pad] = sh; // fill pads array
+
+    semAeroLand[sh.id].release(); // tell passengers we've landed
 
     if (sh.passengers == 0) {
       semPadReady[pad].release(); // if plane arrives empty it can accept passengers right away
@@ -345,7 +335,7 @@ class Airport {
   // airport that the pad has been emptied
   public void launch(int dest) {
     // your code here
-    semPadLand[dest].release(); // pad is now empty
-    pads[dest] = null;
+    semPadLand[dest].release();
+    pads[dest] = null; // pad is now empty
   }
 }
